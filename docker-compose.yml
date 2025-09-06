@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # Frontend application
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - backend
+    networks:
+      - qa-ai-network
+
+  # Backend API (Supabase Edge Functions)
+  backend:
+    image: supabase/edge-runtime:latest
+    ports:
+      - "3001:8000"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - GROK_API_KEY=${GROK_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AI_MODEL=${AI_MODEL:-grok-3}
+    volumes:
+      - ./supabase/functions:/app/functions
+    command: ["deno", "run", "--allow-net", "--allow-env", "/app/functions/server/index.tsx"]
+    networks:
+      - qa-ai-network
+
+  # PostgreSQL database (for local development)
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: qa_ai_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - qa-ai-network
+
+  # Redis cache (optional)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - qa-ai-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  qa-ai-network:
+    driver: bridge
