@@ -10,6 +10,7 @@ export function ApiKeyTester() {
   const [testResults, setTestResults] = useState<{
     deepseek: boolean;
     openrouter: boolean;
+    nebius: boolean;
   } | null>(null);
 
   const testApiKeys = async () => {
@@ -18,7 +19,8 @@ export function ApiKeyTester() {
     try {
       const results = {
         deepseek: false,
-        openrouter: false
+        openrouter: false,
+        nebius: false
       };
 
       // Test DeepSeek API
@@ -87,9 +89,41 @@ export function ApiKeyTester() {
         }
       }
 
+      // Test Nebius API
+      if (config.NEBIUS_API_KEY) {
+        try {
+          const response = await fetch(config.NEBIUS_API_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${config.NEBIUS_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: 'openai/gpt-oss-20b',
+              messages: [
+                {
+                  role: 'user',
+                  content: 'Hello'
+                }
+              ],
+              max_tokens: 10
+            })
+          });
+          
+          if (response.ok) {
+            results.nebius = true;
+            console.log('✅ Nebius API key works');
+          } else {
+            console.log('❌ Nebius API key does not work:', response.status);
+          }
+        } catch (error) {
+          console.log('❌ Nebius API testing error:', error);
+        }
+      }
+
       setTestResults(results);
       
-      if (results.deepseek || results.openrouter) {
+      if (results.deepseek || results.openrouter || results.nebius) {
         toast.success('API keys tested!');
       } else {
         toast.error('No API key works');
@@ -124,6 +158,12 @@ export function ApiKeyTester() {
               {config.OPENROUTER_API_KEY ? "Configured" : "Not configured"}
             </Badge>
           </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm">Nebius API:</span>
+            <Badge variant={config.NEBIUS_API_KEY ? "default" : "destructive"}>
+              {config.NEBIUS_API_KEY ? "Configured" : "Not configured"}
+            </Badge>
+          </div>
         </div>
 
         {testResults && (
@@ -139,6 +179,12 @@ export function ApiKeyTester() {
               <span className="text-sm">OpenRouter:</span>
               <Badge variant={testResults.openrouter ? "default" : "destructive"}>
                 {testResults.openrouter ? "Works" : "Does not work"}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm">Nebius:</span>
+              <Badge variant={testResults.nebius ? "default" : "destructive"}>
+                {testResults.nebius ? "Works" : "Does not work"}
               </Badge>
             </div>
           </div>

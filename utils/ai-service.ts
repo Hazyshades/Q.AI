@@ -239,10 +239,17 @@ class AIService {
     }
     
     if (config.OPENROUTER_API_KEY && config.OPENROUTER_API_KEY.trim() !== '') {
-      availableModels.push('grok-3', 'gpt-4', 'qwen');
-      console.log('✅ OpenRouter API key found - models available: grok-3, gpt-4, qwen');
+      availableModels.push('grok-3');
+      console.log('✅ OpenRouter API key found - models available: grok-3');
     } else {
       console.log('❌ OpenRouter API key missing or empty');
+    }
+    
+    if (config.NEBIUS_API_KEY && config.NEBIUS_API_KEY.trim() !== '') {
+      availableModels.push('gpt-4', 'qwen');
+      console.log('✅ Nebius API key found - models available: gpt-4, qwen');
+    } else {
+      console.log('❌ Nebius API key missing or empty');
     }
     
     // If no models available, return DeepSeek as fallback
@@ -341,22 +348,28 @@ class AIService {
     }
   }
 
-  private async callQwenAPI(prompt: string): Promise<string> {
+  private async callNebiusGPT4API(prompt: string, role: 'manager' | 'developer' | 'tester' | 'analyst' = 'tester'): Promise<string> {
+    // Determine system prompt based on role
+    const systemPrompts = {
+      manager: 'You are a software development project management expert. Your tasks include analyzing technical requirements and making them transparent by extracting project goals, priorities, key implementation components, and overall overview.',
+      developer: 'You are a software development expert. Your tasks include analyzing technical requirements and extracting structured functional and non-functional requirements, constraints, and implementation scenarios to simplify development.',
+      tester: 'You are a software testing expert. Your tasks include analyzing technical requirements and creating formalized acceptance criteria, test scenarios, and recommendations for test types to build quality test cases.',
+      analyst: 'You are a software requirements analysis expert. Your tasks include analyzing technical requirements, structuring and normalizing them, identifying contradictions and missing information to improve requirements.'
+    };
+
     try {
-      const response = await fetch(config.OPENROUTER_API_URL, {
+      const response = await fetch(config.NEBIUS_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.OPENROUTER_API_KEY}`,
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'Q-AI Test Case Generator'
+          'Authorization': `Bearer ${config.NEBIUS_API_KEY}`,
         },
         body: JSON.stringify({
-          model: 'qwen/qwen3-coder:free',
+          model: 'openai/gpt-oss-20b',
           messages: [
             {
               role: 'system',
-              content: 'You are a software testing expert. Your task is to analyze technical requirements and create quality test cases and checklists.'
+              content: systemPrompts[role]
             },
             {
               role: 'user',
@@ -370,14 +383,66 @@ class AIService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('OpenRouter Qwen API response:', errorText);
-        throw new Error(`OpenRouter Qwen API error: ${response.status} - ${errorText}`);
+        console.error('Nebius GPT-4 API response:', errorText);
+        throw new Error(`Nebius GPT-4 API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
       return data.choices[0].message.content;
     } catch (error) {
-      console.error('OpenRouter Qwen API error:', error);
+      console.error('Nebius GPT-4 API error:', error);
+      throw error;
+    }
+  }
+
+  private async callNebiusQwenAPI(prompt: string, role: 'manager' | 'developer' | 'tester' | 'analyst' = 'tester'): Promise<string> {
+    // Determine system prompt based on role
+    const systemPrompts = {
+      manager: 'You are a software development project management expert. Your tasks include analyzing technical requirements and making them transparent by extracting project goals, priorities, key implementation components, and overall overview.',
+      developer: 'You are a software development expert. Your tasks include analyzing technical requirements and extracting structured functional and non-functional requirements, constraints, and implementation scenarios to simplify development.',
+      tester: 'You are a software testing expert. Your tasks include analyzing technical requirements and creating formalized acceptance criteria, test scenarios, and recommendations for test types to build quality test cases.',
+      analyst: 'You are a software requirements analysis expert. Your tasks include analyzing technical requirements, structuring and normalizing them, identifying contradictions and missing information to improve requirements.'
+    };
+
+    try {
+      const response = await fetch(config.NEBIUS_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.NEBIUS_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'Qwen/Qwen3-30B-A3B',
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompts[role]
+            },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: prompt
+                }
+              ]
+            }
+          ],
+          temperature: 0.3,
+          max_tokens: 4000
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Nebius Qwen API response:', errorText);
+        throw new Error(`Nebius Qwen API error: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      return data.choices[0].message.content;
+    } catch (error) {
+      console.error('Nebius Qwen API error:', error);
       throw error;
     }
   }
@@ -520,23 +585,23 @@ class AIService {
            }
            
          case 'gpt-4':
-           if (config.OPENROUTER_API_KEY) {
-             // Call GPT-4 API via OpenRouter
-             const response = await this.callOpenAIAPI(prompt);
+           if (config.NEBIUS_API_KEY) {
+             // Call GPT-4 API via Nebius
+             const response = await this.callNebiusGPT4API(prompt, role);
              return { response, model: 'gpt-4' };
            } else {
-             console.error('❌ OpenRouter API key not configured for GPT-4 model!');
-             throw new Error('OpenRouter API key required for GPT-4 model. Add VITE_OPENROUTER_API_KEY to .env.local file');
+             console.error('❌ Nebius API key not configured for GPT-4 model!');
+             throw new Error('Nebius API key required for GPT-4 model. Add VITE_NEBIUS_API_KEY to .env.local file');
            }
            
          case 'qwen':
-           if (config.OPENROUTER_API_KEY) {
-             // Call Qwen API via OpenRouter
-             const response = await this.callQwenAPI(prompt);
-                           return { response, model: 'qwen3-coder:free' };
+           if (config.NEBIUS_API_KEY) {
+             // Call Qwen API via Nebius
+             const response = await this.callNebiusQwenAPI(prompt, role);
+             return { response, model: 'Qwen3-30B-A3B' };
            } else {
-             console.error('❌ OpenRouter API key not configured for Qwen model!');
-             throw new Error('OpenRouter API key required for Qwen model. Add VITE_OPENROUTER_API_KEY to .env.local file');
+             console.error('❌ Nebius API key not configured for Qwen model!');
+             throw new Error('Nebius API key required for Qwen model. Add VITE_NEBIUS_API_KEY to .env.local file');
            }
            
                    case 'deepseek':
@@ -705,13 +770,27 @@ class AIService {
 
       const result = JSON.parse(jsonMatch[0]);
       
-      // Result validation
-      if (!result.type || !result.data) {
+      // Result validation - check for new structure with structuredTesting
+      if (!result.structuredTesting && (!result.type || !result.data)) {
         throw new Error('Invalid response structure from AI');
       }
 
+      // Transform new structure to expected format if needed
+      let analysisResult: AIAnalysisResult;
+      if (result.structuredTesting) {
+        // New structure from Nebius models
+        analysisResult = {
+          type: 'structuredTesting',
+          data: result.structuredTesting,
+          summary: result.summary || '',
+          metadata: result.metadata || {}
+        } as AIAnalysisResult;
+      } else {
+        // Legacy structure
+        analysisResult = result as AIAnalysisResult;
+      }
+
       // Add model information to result
-      const analysisResult = result as AIAnalysisResult;
       if (analysisResult.metadata) {
         analysisResult.metadata.aiModel = model;
       } else {

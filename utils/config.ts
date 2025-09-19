@@ -1,6 +1,7 @@
 // API Keys
 export const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || '';
 export const DEEPSEEK_API_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY || '';
+export const NEBIUS_API_KEY = import.meta.env.VITE_NEBIUS_API_KEY || '';
 export const GOOGLE_SHEETS_API_KEY = import.meta.env.VITE_GOOGLE_SHEETS_API_KEY || '';
 
 // Supabase Configuration
@@ -17,16 +18,16 @@ export const AI_MODELS = {
     temperature: 0.7
   },
   'gpt-4': {
-    name: 'GPT-4',
-    provider: 'OpenAI (via OpenRouter)',
-    modelId: 'openai/gpt-4',
+    name: 'GPT-OSS-20B',
+    provider: 'OpenAI (via Nebius)',
+    modelId: 'openai/gpt-oss-20b',
     maxTokens: 4096,
     temperature: 0.7
   },
   'qwen': {
-    name: 'Qwen3 Coder 480B',
-    provider: 'Alibaba (via OpenRouter)',
-    modelId: 'qwen/qwen3-coder:free',
+    name: 'Qwen3-30B-A3B',
+    provider: 'Alibaba (via Nebius)',
+    modelId: 'Qwen/Qwen3-30B-A3B',
     maxTokens: 262144,
     temperature: 0.7
   },
@@ -114,6 +115,7 @@ export const validateApiKeys = () => {
   
   if (!OPENROUTER_API_KEY) missingKeys.push('VITE_OPENROUTER_API_KEY');
   if (!DEEPSEEK_API_KEY) missingKeys.push('VITE_DEEPSEEK_API_KEY');
+  if (!NEBIUS_API_KEY) missingKeys.push('VITE_NEBIUS_API_KEY');
   
   return {
     isValid: missingKeys.length === 0,
@@ -160,11 +162,13 @@ export const config = {
   // API Keys
   OPENROUTER_API_KEY,
   DEEPSEEK_API_KEY,
+  NEBIUS_API_KEY,
   GOOGLE_SHEETS_API_KEY,
   
   // API URLs
   OPENROUTER_API_URL: 'https://openrouter.ai/api/v1/chat/completions',
   DEEPSEEK_API_URL: 'https://api.deepseek.com/v1/chat/completions',
+  NEBIUS_API_URL: 'https://api.studio.nebius.com/v1/chat/completions',
   
   // Supabase Configuration
   SUPABASE_URL,
@@ -194,3 +198,4 @@ export const config = {
 console.log('🔑 API Keys:');
 console.log('  - DeepSeek:', config.DEEPSEEK_API_KEY ? 'Configured' : 'Not configured');
 console.log('  - OpenRouter:', config.OPENROUTER_API_KEY ? 'Configured' : 'Not configured');
+console.log('  - Nebius:', config.NEBIUS_API_KEY ? 'Configured' : 'Not configured');
