@@ -1,4 +1,4 @@
-# Q-AI Test Case Generator
+# Q.AI
 
 AI-powered platform for generating test cases, checklists, and documentation analysis from technical requirements.
 
@@ -24,7 +24,7 @@ AI-powered platform for generating test cases, checklists, and documentation ana
 - Node.js 18+ 
 - npm or yarn
 - Supabase account
-- AI API keys (OpenRouter, DeepSeek)
+- AI API keys (Nebius)
 
 ## 🚀 Quick Start
 
@@ -108,7 +108,7 @@ Vercel will automatically deploy on every push to main branch.
 
 ## 🤖 AI Models
 
-The application supports multiple AI models:
+The application supports multiple AI models via [Nebius](https://studio.nebius.com "Nebius Studio")
 
 - **Grok-3** - Advanced reasoning
 - **GPT-4** - High-quality analysis
@@ -124,12 +124,6 @@ The application supports multiple AI models:
 4. **Developer Analysis** - Technical implementation insights
 5. **Manager Analysis** - Project planning and resource estimation
 6. **Structured Testing** - Comprehensive testing strategy
-
-## 🔐 Security
-
-- API keys are stored as environment variables
-- No sensitive data is committed to the repository
-- Supabase handles authentication and data security
 
 ## 📝 License
 
