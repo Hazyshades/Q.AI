@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './supabase-client';
 import { config } from './config';
 
 export interface ContextMemory {
@@ -67,12 +67,7 @@ class ContextMemoryService {
   private currentSessionId: string | null = null;
 
   constructor() {
-    if (config.SUPABASE_URL && config.SUPABASE_ANON_KEY) {
-      this.supabase = createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY);
-      console.log('Supabase client initialized');
-    } else {
-      console.log('Supabase credentials not found, using localStorage only');
-    }
+    this.supabase = supabase;
     
     // Restore currentProjectId from localStorage
     const savedProjectId = localStorage.getItem('currentProjectId');

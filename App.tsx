@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
 import { Button } from './components/ui/button';
 import { Label } from './components/ui/label';
@@ -15,260 +15,43 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { AuthModal } from './components/AuthModal';
 import { UserProfile } from './components/UserProfile';
 import { ContextManager } from './components/ContextManager';
-
-import { aiService, AIAnalysisResult } from './utils/ai-service';
-import { DatabaseService } from './utils/database-service';
-import { useAuth } from './utils/auth-provider';
-import { initializeAiModelFromSettings, config } from './utils/config';
-import { toast } from 'sonner'; 
+import { useAppLogic } from './utils/use-app-logic';
+import { config } from './utils/config';
+import { toast } from 'sonner';
 
 export default function App() {
-  const { user, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState('upload');
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [textInput, setTextInput] = useState('');
-  const [outputType, setOutputType] = useState('testcases');
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
-  const [results, setResults] = useState<AIAnalysisResult | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [history, setHistory] = useState<any[]>([]);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [showUserProfile, setShowUserProfile] = useState(false);
-  const [showContextManager, setShowContextManager] = useState(false);
-  const [currentProjectId, setCurrentProjectId] = useState<string | null>(() => {
-    return localStorage.getItem('currentProjectId');
-  });
-  const [currentProjectName, setCurrentProjectName] = useState<string | null>(() => {
-    return localStorage.getItem('currentProjectName');
-  });
-  // Initialize AI model from user settings on authorization
-  useEffect(() => {
-    if (user && !authLoading) {
-      initializeAiModelFromSettings();
-    }
-  }, [user, authLoading]);
-
-
-  // Debug function for tracking outputType changes
-  const handleOutputTypeChange = (type: string) => {
-    // Mode switched
-    setOutputType(type);
-    // Clear previous results when switching modes
-    setResults(null);
-  };
-
-  const handleFileUpload = (file: File) => {
-    setUploadedFile(file);
-  };
-
-  const uploadDocument = async () => {
-    if (!uploadedFile && !textInput.trim()) {
-      toast.error('Please upload a file or enter text');
-      return;
-    }
-
-    setIsProcessing(true);
-    
-    try {
-      // Start document processing
-      
-      // Client-side processing - proceed directly to generation
-      const content = uploadedFile ? await readFileContent(uploadedFile) : textInput;
-      
-      // Generate unique sessionId
-      const newSessionId = Date.now().toString();
-      
-      // Generate results
-      await generateResults(newSessionId, content);
-      
-    } catch (error) {
-      console.error('Upload error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast.error(`Upload error: ${errorMessage}`);
-      setIsProcessing(false);
-    }
-  };
-
-  // Function to read file content
-  const readFileContent = async (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const content = e.target?.result as string;
-        resolve(content);
-      };
-      reader.onerror = reject;
-      reader.readAsText(file);
-    });
-  };
-
-  const generateResults = async (currentSessionId: string, content?: string) => {
-    const startTime = Date.now();
-    
-    try {
-      // Start generating results
-      
-      // Get content from parameter or state
-      const textContent = content || (uploadedFile ? await readFileContent(uploadedFile) : textInput);
-      if (!textContent) {
-        throw new Error('No content for analysis');
-      }
-      
-      // Determine prompt based on selected roles
-      let analysisResult;
-      if (outputType === 'documentation-analysis') {
-        // If roles are selected, use corresponding prompts
-        if (selectedRoles.includes('analyst')) {
-          analysisResult = await aiService.analyzeWithRole(textContent, 'analyst');
-        } else if (selectedRoles.includes('developer')) {
-          analysisResult = await aiService.analyzeWithRole(textContent, 'developer');
-        } else if (selectedRoles.includes('manager')) {
-          analysisResult = await aiService.analyzeWithRole(textContent, 'manager');
-        } else {
-          // If no roles are selected, use standard analyst prompt
-          analysisResult = await aiService.analyzeWithRole(textContent, 'analyst');
-        }
-      } else {
-        // For other types use standard logic
-        analysisResult = await aiService.analyzeRequirements(textContent, outputType as 'testcases' | 'checklist' | 'documentation-analysis');
-      }
-      
-      // Check that result matches expected type
-      let results;
-      if (outputType === 'testcases' && analysisResult.type === 'testcases') {
-        results = analysisResult;
-      } else if (outputType === 'checklist' && analysisResult.type === 'checklist') {
-        results = analysisResult;
-      } else if (outputType === 'documentation-analysis' && 
-                 (analysisResult.type === 'documentation-analysis' || 
-                  analysisResult.type === 'developer-analysis' || 
-                  analysisResult.type === 'manager-analysis' || 
-                  analysisResult.type === 'structuredTesting')) {
-        // For role-based analysis use result as is
-        results = analysisResult;
-      } else {
-        // If types don't match, create result of needed type
-        if (outputType === 'testcases') {
-          results = {
-            type: 'testcases' as const,
-            data: analysisResult.data,
-            summary: analysisResult.summary,
-            metadata: analysisResult.metadata
-          };
-        } else if (outputType === 'checklist') {
-          results = {
-            type: 'checklist' as const,
-            data: analysisResult.data,
-            summary: analysisResult.summary,
-            metadata: analysisResult.metadata
-          };
-        } else if (outputType === 'documentation-analysis') {
-          // Handle role-based analysis
-          if (selectedRoles.length > 0) {
-            // If roles are selected, use role-based analysis result
-            results = analysisResult;
-          } else {
-            // If no roles are selected, use regular documentation analysis
-            results = {
-              type: 'documentation-analysis' as const,
-              data: analysisResult.data,
-              summary: analysisResult.summary,
-              metadata: analysisResult.metadata
-            };
-          }
-        } else {
-          // Fallback for unknown types
-          results = analysisResult;
-        }
-      }
-      
-      // Check that results is defined
-      if (!results) {
-        throw new Error('Failed to create analysis result');
-      }
-      
-             // Results received
-       
-       // Save to database if user is authorized
-       if (user) {
-         const processingTime = Date.now() - startTime;
-         // Determine model from result or use fallback
-         const aiModel = results.metadata?.aiModel || 'unknown';
-         await DatabaseService.saveGenerationSession(
-           currentSessionId,
-           textContent,
-           outputType as 'testcases' | 'checklist' | 'documentation-analysis' | 'developer-analysis' | 'manager-analysis' | 'structuredTesting',
-           results,
-           undefined, // projectId
-           aiModel, // aiModel - now determined automatically
-           processingTime
-         );
-       }
-      
-      setResults(results);
-      setActiveTab('results');
-      toast.success('Results generated successfully!');
-      
-    } catch (error) {
-      console.error('Generation error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast.error(`Generation error: ${errorMessage}`);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  // Functions for working with history
-  const loadHistory = async () => {
-    if (!user) return;
-    
-    try {
-      const historyData = await DatabaseService.getGenerationHistory();
-      setHistory(historyData);
-    } catch (error) {
-      console.error('History load error:', error);
-      toast.error('Error loading history');
-    }
-  };
-
-  const loadHistoryItem = async (sessionId: string) => {
-    try {
-      // Find session by session_id (number)
-      const session = await DatabaseService.getGenerationSession(sessionId);
-      if (session) {
-        setResults(session.results);
-        setActiveTab('results');
-        // setSessionId(sessionId);
-        toast.success('History loaded');
-      } else {
-        throw new Error('Session not found');
-      }
-    } catch (error) {
-      console.error('Load history item error:', error);
-      toast.error('Error loading history item');
-    }
-  };
-
-  // Load history when user changes
-  React.useEffect(() => {
-    if (user) {
-      loadHistory();
-    } else {
-      setHistory([]);
-    }
-  }, [user]);
-
-  // Update history when switching to history tab
-  const handleHistoryTabChange = () => {
-    if (user && activeTab === 'history') {
-      loadHistory();
-    }
-  };
-
-  React.useEffect(() => {
-    handleHistoryTabChange();
-  }, [activeTab, user]);
+  const {
+    user,
+    activeTab,
+    setActiveTab,
+    uploadedFile,
+    textInput,
+    setTextInput,
+    outputType,
+    selectedRoles,
+    setSelectedRoles,
+    results,
+    setResults,
+    isProcessing,
+    history,
+    showSettings,
+    setShowSettings,
+    showAuthModal,
+    setShowAuthModal,
+    showUserProfile,
+    setShowUserProfile,
+    showContextManager,
+    setShowContextManager,
+    currentProjectId,
+    setCurrentProjectId,
+    currentProjectName,
+    setCurrentProjectName,
+    handleOutputTypeChange,
+    handleFileUpload,
+    uploadDocument,
+    loadHistory,
+    loadHistoryItem,
+  } = useAppLogic();
 
   return (
     <>

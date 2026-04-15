@@ -5,14 +5,15 @@ import { Badge } from './ui/badge';
 import { Checkbox } from './ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Download, FileText, CheckSquare, Copy, Share2, Sparkles, ExternalLink, ChevronDown, CheckCircle, XCircle, AlertTriangle, Settings } from 'lucide-react';
+import { Download, FileText, CheckSquare, Copy, Share2, Sparkles, ExternalLink, ChevronDown, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
-import { exportService } from '../utils/export-service';
 import { TestCaseEnhancer } from './TestCaseEnhancer';
 import { ResultsFilters } from './ResultsFilters';
 import { JiraSettings } from './JiraSettings';
+import { ExportToolbar } from './ExportToolbar';
 import { DocumentationAnalysisDisplay } from './DocumentationAnalysisDisplay';
 import { TestCase, ChecklistItem, AIAnalysisResult } from '../utils/ai-service';
+import { getPriorityColor } from '../utils/shared-utils';
 
 interface ResultsDisplayProps {
   results: AIAnalysisResult;
@@ -23,8 +24,6 @@ export function ResultsDisplay({ results, onResultsUpdate }: ResultsDisplayProps
   const [checkedItems, setCheckedItems] = useState<{ [key: number]: boolean }>({});
   const [failedItems, setFailedItems] = useState<{ [key: number]: boolean }>({});
   const [showEnhancer, setShowEnhancer] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-  const [showTestOpsMenu, setShowTestOpsMenu] = useState(false);
   const [selectedChecklistItem, setSelectedChecklistItem] = useState<any>(null);
   const [showJiraSettings, setShowJiraSettings] = useState(false);
   const [filters, setFilters] = useState({
@@ -74,178 +73,26 @@ export function ResultsDisplay({ results, onResultsUpdate }: ResultsDisplayProps
     return <DocumentationAnalysisDisplay analysisResult={results} />;
   }
 
-     const handleCheckboxChange = (id: number, checked: boolean) => {
-     setCheckedItems(prev => ({ ...prev, [id]: checked }));
-   };
+  const handleCheckboxChange = (id: number, checked: boolean) => {
+    setCheckedItems(prev => ({ ...prev, [id]: checked }));
+  };
 
-     const handleChecklistItemClick = (item: any) => {
-    // Toggle action display state for item
+  const handleChecklistItemClick = (item: any) => {
     setSelectedChecklistItem(selectedChecklistItem?.id === item.id ? null : item);
   };
 
-     const handleChecklistAction = (action: 'pass' | 'fail', item: any) => {
+  const handleChecklistAction = (action: 'pass' | 'fail', item: any) => {
     if (action === 'pass') {
-      // Mark as passed
       setCheckedItems(prev => ({ ...prev, [item.id]: true }));
-      // Remove from failed, if was there
       setFailedItems(prev => ({ ...prev, [item.id]: false }));
       toast.success('Item marked as passed');
     } else if (action === 'fail') {
-      // Mark as failed
       setFailedItems(prev => ({ ...prev, [item.id]: true }));
-      // Remove from passed, if was there
       setCheckedItems(prev => ({ ...prev, [item.id]: false }));
-      // Open Jira with prefilled data
-      openJiraWithIssue(item);
+      toast.info('Jira integration - see Export toolbar');
     }
-
-    // Hide actions after execution
     setSelectedChecklistItem(null);
   };
-
-       const openJiraWithIssue = (item: any) => {
-      // Get saved Jira configuration
-      const savedConfig = localStorage.getItem('jiraConfig');
-            const config = savedConfig ? JSON.parse(savedConfig) : {
-         baseUrl: 'https://ddsm-jira.digdes.com',
-         projectId: '23000',
-         issueTypeId: '10003',
-         priorityId: '3',
-         components: 'QA',
-         labels: 'qa,checklist,automated'
-       };
-
-                    // Prepare data for filling
-       const formData = {
-         summary: `[QA] ${item.item.substring(0, 100)}${item.item.length > 100 ? '...' : ''}`,
-         description: `**Problem Description:**\n${item.item}\n\n**Context:**\nChecklist item #${item.id}\n\n**Steps to Reproduce:**\n1. Open application\n2. Perform check: ${item.item}\n\n**Expected Result:**\nItem should pass\n\n**Actual Result:**\nItem failed`,
-         priority: config.priorityId,
-         components: config.components,
-         labels: config.labels
-       };
-
-               // Form URL with project parameters, task type and prefilled fields
-        const params = new URLSearchParams({
-          pid: config.projectId,
-          issuetype: config.issueTypeId
-        });
-        
-        // Add bookmarklet data to URL
-        const bookmarkletData = encodeURIComponent(JSON.stringify(formData));
-        const jiraUrl = `${config.baseUrl}/secure/CreateIssue.jspa?${params.toString()}&bookmarkletData=${bookmarkletData}`;
-
-             // Create JavaScript code for field filling
-       const jsCode = `
-         // Function to fill Jira fields
-         function fillJiraForm() {
-           // Fill Jira fields
-           
-           try {
-             // Fill Summary
-             const summaryField = document.getElementById('summary') || document.querySelector('input[name="summary"]');
-             if (summaryField) {
-               summaryField.value = '${formData.summary.replace(/'/g, "\\'")}';
-               summaryField.dispatchEvent(new Event('input', { bubbles: true }));
-               // Summary filled
-             } else {
-               // Summary field not found
-             }
-             
-             // Fill Description
-             const descField = document.getElementById('description') || document.querySelector('textarea[name="description"]');
-             if (descField) {
-               descField.value = '${formData.description.replace(/'/g, "\\'").replace(/\n/g, '\\n')}';
-               descField.dispatchEvent(new Event('input', { bubbles: true }));
-               // Description filled
-             } else {
-               // Description field not found
-             }
-             
-             // Fill Priority
-             const priorityField = document.getElementById('priority') || document.querySelector('select[name="priority"]');
-             if (priorityField) {
-               priorityField.value = '${formData.priority}';
-               priorityField.dispatchEvent(new Event('change', { bubbles: true }));
-               // Priority filled
-             } else {
-               // Priority field not found
-             }
-             
-             // Fill Components
-             const componentsField = document.getElementById('components') || document.querySelector('input[name="components"]');
-             if (componentsField) {
-               componentsField.value = '${formData.components}';
-               componentsField.dispatchEvent(new Event('input', { bubbles: true }));
-               // Components filled
-             } else {
-               // Components field not found
-             }
-             
-             // Fill Labels
-             const labelsField = document.getElementById('labels') || document.querySelector('input[name="labels"]');
-             if (labelsField) {
-               labelsField.value = '${formData.labels}';
-               labelsField.dispatchEvent(new Event('input', { bubbles: true }));
-               // Labels filled
-             } else {
-               // Labels field not found
-             }
-             
-             // Field filling completed
-           } catch (error) {
-             console.error('❌ Error filling fields:', error);
-           }
-         }
-         
-         // Call filling function
-         fillJiraForm();
-         
-         // Retry after 2 seconds in case form is still loading
-         setTimeout(fillJiraForm, 2000);
-       `;
-
-                     // Show debug information
-                     // Data prepared for URL transmission
-        
-        // Open Jira in new tab
-        const jiraWindow = window.open(jiraUrl, '_blank');
-       
-
-       
-               // Create bookmarklet for automatic filling
-        const bookmarkletCode = `javascript:(function(){function fillJiraForm(){try{const urlParams=new URLSearchParams(window.location.search);const bookmarkletData=urlParams.get('bookmarkletData');if(!bookmarkletData){const summaryField=document.getElementById('summary')||document.querySelector('input[name="summary"]');if(summaryField&&summaryField.value&&summaryField.value.includes('[QA]')){return;}alert('Filling data not found in URL. First click "Error (Create Jira task)" in the application.');return;}const formData=JSON.parse(decodeURIComponent(bookmarkletData));const summaryField=document.getElementById('summary')||document.querySelector('input[name="summary"]');if(summaryField){summaryField.value=formData.summary;summaryField.dispatchEvent(new Event('input',{bubbles:true}));}const descField=document.getElementById('description')||document.querySelector('textarea[name="description"]');if(descField){descField.value=formData.description;descField.dispatchEvent(new Event('input',{bubbles:true}));}const priorityField=document.getElementById('priority')||document.querySelector('select[name="priority"]');if(priorityField){priorityField.value=formData.priority;priorityField.dispatchEvent(new Event('change',{bubbles:true}));}const componentsField=document.getElementById('components')||document.querySelector('input[name="components"]');if(componentsField){componentsField.value=formData.components;componentsField.dispatchEvent(new Event('input',{bubbles:true}));}const labelsField=document.getElementById('labels')||document.querySelector('input[name="labels"]');if(labelsField){labelsField.value=formData.labels;labelsField.dispatchEvent(new Event('input',{bubbles:true}));}const notification=document.createElement('div');notification.style.cssText='position: fixed; top: 20px; right: 20px; background: #4CAF50; color: white; padding: 15px 20px; border-radius: 8px; z-index: 99999; box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-family: Arial, sans-serif; font-size: 14px;';notification.innerHTML='✅ Fields filled automatically!';document.body.appendChild(notification);setTimeout(()=>{if(notification.parentNode){notification.parentNode.removeChild(notification);}},5000);const newUrl=new URL(window.location);newUrl.searchParams.delete('bookmarkletData');window.history.replaceState({},'',newUrl);}catch(error){alert('Error filling fields: '+error.message);}}if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',fillJiraForm);}else{fillJiraForm();}setTimeout(fillJiraForm,2000);setTimeout(fillJiraForm,5000);})();`;
-        
-        // Copy bookmarklet to clipboard
-        navigator.clipboard.writeText(bookmarkletCode).then(() => {
-                       // Bookmarklet copied to clipboard
-          
-          // Show bookmarklet information
-                       // Bookmarklet usage instructions
-          
-          // Show instructions to user
-          toast.success('Bookmarklet copied to clipboard! Create a bookmark for automatic Jira field filling.', {
-            duration: 8000
-          });
-          
-          // Show additional instructions
-          setTimeout(() => {
-            toast.info('Create a bookmark in your browser and paste the copied code in the URL field. Name the bookmark "Fill Jira".', {
-              duration: 10000
-            });
-          }, 3000);
-          
-        }).catch(() => {
-                       // Failed to copy bookmarklet
-          
-          // Show manual filling information
-                       // Manual Jira field filling
-          
-          // Show instructions to user
-          toast.success('Jira task creation page opened. Paste the code from console to fill fields!', {
-            duration: 5000
-          });
-        });
-    };
 
   // Data filtering and sorting
   const filteredAndSortedData = useMemo(() => {
@@ -283,7 +130,7 @@ export function ResultsDisplay({ results, onResultsUpdate }: ResultsDisplayProps
   // Grouping by modules
   const groupedData = useMemo(() => {
     const groups: { [key: string]: any[] } = {};
-    
+
     filteredAndSortedData.forEach((item: any) => {
       const module = item.module || 'No Module';
       if (!groups[module]) {
@@ -294,123 +141,6 @@ export function ResultsDisplay({ results, onResultsUpdate }: ResultsDisplayProps
 
     return groups;
   }, [filteredAndSortedData]);
-
-  const exportToJSON = async () => {
-    try {
-      setIsExporting(true);
-      const blob = await exportService.exportToJSON(results);
-      const filename = `${results.type}_export_${new Date().toISOString().split('T')[0]}.json`;
-      exportService.downloadFile(blob, filename);
-              toast.success('JSON export completed');
-    } catch (error) {
-      console.error('JSON export error:', error);
-              toast.error('JSON export error');
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-
-  const exportToExcel = async () => {
-    try {
-      setIsExporting(true);
-      const blob = await exportService.exportToExcel(results);
-      const filename = `${results.type}_export_${new Date().toISOString().split('T')[0]}.xlsx`;
-      exportService.downloadFile(blob, filename);
-              toast.success('Excel export completed');
-    } catch (error) {
-      console.error('Excel export error:', error);
-              toast.error('Excel export error');
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  
-  const exportToCSV = async () => {
-    try {
-      setIsExporting(true);
-      const blob = await exportService.exportToCSV(results);
-      const filename = `${results.type}_export_${new Date().toISOString().split('T')[0]}.csv`;
-      exportService.downloadFile(blob, filename);
-              toast.success('CSV export completed');
-    } catch (error) {
-      console.error('CSV export error:', error);
-              toast.error('CSV export error');
-    } finally {
-      setIsExporting(false);
-    }
-  };
-//TEST-OPS
-  const exportToTestOps = async () => {
-    try {
-      setIsExporting(true);
-      const blob = await exportService.exportToTestOps(results);
-      const filename = `${results.type}_testops_${new Date().toISOString().split('T')[0]}.csv`;
-      exportService.downloadFile(blob, filename);
-              toast.success('Test-Ops format export completed');
-    } catch (error) {
-      console.error('Test-Ops export error:', error);
-              toast.error('Test-Ops format export error');
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  //TEST-RAIL
-  const exportToTestRail = async () => {
-    try {
-      setIsExporting(true);
-      const blob = await exportService.exportToTestRail(results);
-      const filename = `${results.type}_testrail_${new Date().toISOString().split('T')[0]}.csv`;
-      exportService.downloadFile(blob, filename);
-              toast.success('TestRail format export completed');
-    } catch (error) {
-      console.error('TestRail export error:', error);
-              toast.error('TestRail format export error');
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const exportToPDF = async () => {
-    try {
-      setIsExporting(true);
-      const blob = await exportService.exportToPDF(results);
-      const filename = `${results.type}_export_${new Date().toISOString().split('T')[0]}.pdf`;
-      exportService.downloadFile(blob, filename);
-              toast.success('PDF export completed');
-    } catch (error) {
-      console.error('PDF export error:', error);
-              toast.error('PDF export error');
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const exportToGoogleSheets = async () => {
-    try {
-      setIsExporting(true);
-      await exportService.exportToGoogleSheets(results);
-              toast.success('Google Sheets export completed');
-    } catch (error) {
-      console.error('Google Sheets export error:', error);
-              toast.error('Google Sheets export error');
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const copyToClipboard = async () => {
-    try {
-      const text = JSON.stringify(results, null, 2);
-      await navigator.clipboard.writeText(text);
-      toast.success('Copied to clipboard');
-    } catch (error) {
-      console.error('Copy error:', error);
-      toast.error('Copy error');
-    }
-  };
 
   const handleEnhanceTestCases = (enhancedTestCases: TestCase[]) => {
           // Update results with enhanced test cases
@@ -427,25 +157,6 @@ export function ResultsDisplay({ results, onResultsUpdate }: ResultsDisplayProps
           toast.success('Test cases enhanced!');
   };
 
-  // Close menu when clicking outside
-  React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element;
-      if (!target.closest('.testops-menu')) {
-        setShowTestOpsMenu(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-  const getPriorityColor = (priority: string): "default" | "secondary" | "destructive" | "outline" => {
-    return "outline";
-  };
-
   const totalCount = (results.data as any[])?.length || 0;
   const completedCount = results.type === 'checklist'
     ? (results.data as ChecklistItem[]).filter(item => checkedItems[item.id] || item.checked).length
@@ -457,6 +168,10 @@ export function ResultsDisplay({ results, onResultsUpdate }: ResultsDisplayProps
   const completionPercentage = results.type === 'checklist'
     ? Math.round((completedCount / totalCount) * 100)
     : 0;
+
+  const getBadgeVariant = (priority: string): "default" | "secondary" | "destructive" | "outline" => {
+    return getPriorityColor(priority) as any;
+  };
 
      return (
      <div className="space-y-6 relative">
@@ -491,133 +206,11 @@ export function ResultsDisplay({ results, onResultsUpdate }: ResultsDisplayProps
                  }
                </CardDescription>
             </div>
-                         <div className="flex items-center gap-2">
-               <Button 
-                 variant="outline" 
-                 size="sm" 
-                 onClick={copyToClipboard} 
-                 className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300 transition-colors"
-               >
-                 <Copy className="h-4 w-4 mr-1" />
-                 Copy
-               </Button>
-               
-               {/* CSV dropdown menu */}
-               <div className="relative testops-menu">
-                 <Button 
-                   variant="outline" 
-                   size="sm" 
-                   onClick={() => setShowTestOpsMenu(!showTestOpsMenu)}
-                   className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100 hover:border-green-300 transition-colors flex items-center gap-1"
-                 >
-                   <Download className="h-4 w-4" />
-                   CSV
-                   <ChevronDown className={`h-3 w-3 transition-transform ${showTestOpsMenu ? 'rotate-180' : ''}`} />
-                 </Button>
-                 
-                 {showTestOpsMenu && (
-                   <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50">
-                     <button
-                       onClick={() => {
-                         exportToCSV();
-                         setShowTestOpsMenu(false);
-                       }}
-                       disabled={isExporting}
-                       className="w-full px-3 py-2 text-left text-sm hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed border-b border-gray-100"
-                     >
-                       <Download className="h-4 w-4 inline mr-2" />
-                       CSV
-                     </button>
-                     <button
-                       onClick={() => {
-                         exportToTestOps();
-                         setShowTestOpsMenu(false);
-                       }}
-                       disabled={isExporting}
-                       className="w-full px-3 py-2 text-left text-sm hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed border-b border-gray-100"
-                     >
-                       <Download className="h-4 w-4 inline mr-2" />
-                       Test-OPS
-                     </button>
-                     <button
-                       onClick={() => {
-                         exportToTestRail();
-                         setShowTestOpsMenu(false);
-                       }}
-                       disabled={isExporting}
-                       className="w-full px-3 py-2 text-left text-sm hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                     >
-                       <Download className="h-4 w-4 inline mr-2" />
-                       Test-Rail
-                     </button>
-                   </div>
-                 )}
-               </div>
-               <Button 
-                 variant="outline" 
-                 size="sm" 
-                 onClick={exportToJSON} 
-                 disabled={isExporting} 
-                 className="bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 hover:border-purple-300 transition-colors"
-               >
-                 <Download className="h-4 w-4 mr-1" />
-                 JSON
-               </Button>
-               <Button 
-                 variant="outline" 
-                 size="sm" 
-                 onClick={exportToExcel} 
-                 disabled={isExporting} 
-                 className="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 transition-colors"
-               >
-                 <Download className="h-4 w-4 mr-1" />
-                 Excel
-               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={exportToPDF} 
-                disabled={true} 
-                className="bg-red-50 text-red-700 border-red-200 hover:bg-red-100 hover:border-red-300 transition-colors opacity-50"
-              >
-                <Download className="h-4 w-4 mr-1" />
-                PDF
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={exportToGoogleSheets} 
-                disabled={true} 
-                className="bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100 hover:border-orange-300 transition-colors opacity-50"
-              >
-                <ExternalLink className="h-4 w-4 mr-1" />
-                Sheets
-              </Button>
-                             {results.type === 'testcases' && (
-                 <Button 
-                   variant="outline" 
-                   size="sm" 
-                   onClick={() => setShowEnhancer(true)} 
-                   disabled={false} 
-                   className="bg-gradient-to-r from-blue-500 to-purple-600 text-white border-0 hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-md hover:shadow-lg"
-                 >
-                   <Sparkles className="h-4 w-4 mr-1" />
-                   Enhance
-                 </Button>
-               )}
-               {results.type === 'checklist' && (
-                 <Button 
-                   variant="outline" 
-                   size="sm" 
-                   onClick={() => setShowJiraSettings(true)} 
-                   disabled={false} 
-                   className="bg-gradient-to-r from-orange-500 to-red-600 text-white border-0 hover:from-orange-600 hover:to-red-700 transition-all duration-200 shadow-md hover:shadow-lg"
-                 >
-                   <Settings className="h-4 w-4 mr-1" />
-                   Jira Settings
-                 </Button>
-               )}
-            </div>
+            <ExportToolbar 
+              results={results}
+              onEnhance={() => setShowEnhancer(true)}
+              onJiraSettings={() => setShowJiraSettings(true)}
+            />
           </div>
           
                      {results.type === 'checklist' && (
@@ -697,7 +290,7 @@ export function ResultsDisplay({ results, onResultsUpdate }: ResultsDisplayProps
                         <TableCell className="w-80">{testCase.description}</TableCell>
                         <TableCell className="w-32">{testCase.module || '-'}</TableCell>
                         <TableCell className="w-32">
-                          <Badge variant={getPriorityColor(testCase.priority)}>
+                          <Badge variant={getBadgeVariant(testCase.priority)}>
                             {testCase.priority}
                           </Badge>
                         </TableCell>
@@ -727,7 +320,7 @@ export function ResultsDisplay({ results, onResultsUpdate }: ResultsDisplayProps
                               <CardDescription className="mt-1">{testCase.description}</CardDescription>
                             </div>
                             <div className="flex items-center gap-2">
-                              <Badge variant={getPriorityColor(testCase.priority)}>
+                              <Badge variant={getBadgeVariant(testCase.priority)}>
                                 {testCase.priority}
                               </Badge>
                               <code className="text-xs bg-gray-100 px-2 py-1 rounded">{testCase.id}</code>

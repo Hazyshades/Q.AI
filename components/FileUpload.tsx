@@ -5,7 +5,7 @@ import { Badge } from './ui/badge';
 import { Upload, File, X } from 'lucide-react';
 
 interface FileUploadProps {
-  onFileUpload: (file: File) => void;
+  onFileUpload: (file: File | null) => void;
   uploadedFile: File | null;
 }
 
@@ -51,7 +51,7 @@ export function FileUpload({ onFileUpload, uploadedFile }: FileUploadProps) {
   };
 
   const removeFile = () => {
-    onFileUpload(null as any);
+    onFileUpload(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }

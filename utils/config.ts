@@ -72,8 +72,6 @@ let defaultAiModel: AIModel = 'deepseek';
 
 export const DEFAULT_AI_MODEL: AIModel = defaultAiModel;
 
-// Debug logging for AI model configuration
-    console.log('🤖 Current AI model:', DEFAULT_AI_MODEL);
 export const DEFAULT_DETAIL_LEVEL = 'medium';
 export const DEFAULT_OUTPUT_FORMAT = 'markdown';
 
@@ -88,24 +86,19 @@ export const getCurrentAiModel = (): AIModel => {
 // Function to set current model
 export const setCurrentAiModel = (model: AIModel): void => {
   currentAiModel = model;
-  console.log('🤖 AI model changed to:', model);
 };
 
 // Function to initialize model from user settings
 export const initializeAiModelFromSettings = async (): Promise<void> => {
   try {
-    // Import DatabaseService only when needed
     const { DatabaseService } = await import('./database-service');
     const userSettings = await DatabaseService.getUserSettings();
-    
+
     if (userSettings?.ai_model && Object.keys(AI_MODELS).includes(userSettings.ai_model)) {
       currentAiModel = userSettings.ai_model as AIModel;
-      console.log('🤖 AI model loaded from user settings:', currentAiModel);
-    } else {
-      console.log('🤖 Using default model:', currentAiModel);
     }
   } catch (error) {
-    console.warn('⚠️ Failed to load user settings, using default model:', error);
+    // Use default model if user settings unavailable
   }
 };
 
@@ -193,9 +186,3 @@ export const config = {
   
   // Test mode settings removed
 };
-
-// Debug logging for API keys after config creation
-console.log('🔑 API Keys:');
-console.log('  - DeepSeek:', config.DEEPSEEK_API_KEY ? 'Configured' : 'Not configured');
-console.log('  - OpenRouter:', config.OPENROUTER_API_KEY ? 'Configured' : 'Not configured');
-console.log('  - Nebius:', config.NEBIUS_API_KEY ? 'Configured' : 'Not configured');
